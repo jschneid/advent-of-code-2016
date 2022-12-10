@@ -4,9 +4,9 @@ def expected_checksum(encrypted_name)
     occurrence_counts[char] += 1
   end
 
-  sorted_occurrence_counts = occurrence_counts.to_a.sort { |a, b| [-1 * a[1], a[0]] <=> [-1 * b[1], b[0]] }
-
-  sorted_occurrence_counts.take(5).map { |a| a[0] }.join
+  sorted_occurrence_counts = occurrence_counts.sort_by { |key, value| [-1 * value, key] }
+  
+  sorted_occurrence_counts.take(5).map(&:first).join
 end
 
 real_room_sector_ids_sum = 0
