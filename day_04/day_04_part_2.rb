@@ -1,0 +1,23 @@
+def expected_checksum(encrypted_name)
+  occurrence_counts = Hash.new(0)
+  encrypted_name.chars.each do |char|
+    occurrence_counts[char] += 1
+  end
+
+  sorted_occurrence_counts = occurrence_counts.sort_by { |key, value| [-1 * value, key] }
+
+  sorted_occurrence_counts.take(5).map(&:first).join
+end
+
+def rotate_room_name(room_name, rotation_count)
+  room_name.bytes.map { |byte| (((byte - 97 + rotation_count) % 26) + 97).chr }.join
+end
+
+File.foreach('input.txt', chomp:true) do |line|
+  checksum = line[-6..-2]
+  sector_id = line[-10..-8].to_i
+  encrypted_name = line[0..-11].delete('-')
+
+  p sector_id if expected_checksum(encrypted_name) == checksum && rotate_room_name(encrypted_name, sector_id) == 'northpoleobjectstorage'
+end
+
