@@ -57,3 +57,6 @@ build-iPhoneSimulator/
 
 # Rubymine
 .idea
+
+# As per Advent of Code best practices
+input.txt
