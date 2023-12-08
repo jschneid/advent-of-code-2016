@@ -53,7 +53,7 @@ def value_to_integer(value, registers)
   end
 end
 
-registers = { 'a' => 0, 'b' => 0, 'c' => 0, 'd' => 0 }
+registers = { 'a' => 0, 'b' => 0, 'c' => 1, 'd' => 0 }
 instructions = read_lines
 process_instructions(instructions, registers)
 pp registers['a']
