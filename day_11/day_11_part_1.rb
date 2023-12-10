@@ -17,12 +17,15 @@ class Floor
     generators.sort == other.generators.sort && microchips.sort == other.microchips.sort
   end
 
-  def vulnerable_microchips
-    microchips - generators
-  end
-
   def can_be_moved_here?(cargo)
-    (vulnerable_microchips - cargo.generators).empty?
+    combined_generators = cargo.generators + generators
+    combined_microchips = cargo.microchips + microchips
+
+    return true if combined_generators.empty?
+    return true if combined_microchips.empty?
+    return false if (combined_microchips - combined_generators).count > 0
+
+    true
   end
 
   def possible_cargos
@@ -30,16 +33,14 @@ class Floor
     generators.each do |generator|
       cargos << Cargo.new([generator], [])
       generators.each do |generator2|
-        cargos << Cargo.new([generator, generator2], []) if generator != generator2
+        cargos << Cargo.new([generator, generator2], []) if generator < generator2
       end
-      microchips.each do |microchip|
-        cargos << Cargo.new([generator], [microchip]) if generator == microchip
-      end
+      cargos << Cargo.new([generator], [generator]) if microchips.include?(generator)
     end
     microchips.each do |microchip|
       cargos << Cargo.new([], [microchip])
       microchips.each do |microchip2|
-        cargos << Cargo.new([], [microchip, microchip2]) if microchip != microchip2
+        cargos << Cargo.new([], [microchip, microchip2]) if microchip < microchip2
       end
     end
     cargos
@@ -68,14 +69,6 @@ class State
 
   def hash
     floors[0].hash ^ floors[1].hash ^ floors[2].hash ^ floors[3].hash ^ elevator_floor.hash
-  end
-
-  def to_str
-    str = "Elevator on floor #{elevator_floor}\n"
-    floors.each_with_index do |floor, index|
-      str += "Floor #{index}: Generators: #{floor.generators} Microchips: #{floor.microchips}\n"
-    end
-    str
   end
 end
 
@@ -108,26 +101,44 @@ end
 
 def possible_next_moves(state, states_seen)
   possible_moves = []
+
   possible_destination_floors = possible_destination_floors(state.elevator_floor)
 
   state.floors[state.elevator_floor].possible_cargos.each do |cargo|
     possible_destination_floors.each do |destination_floor_index|
       next unless state.floors[destination_floor_index].can_be_moved_here?(cargo)
 
+      # To shorten runtime, let's assume there's never a reason to move down with 2 objects
+      next if destination_floor_index < state.elevator_floor && ((cargo.microchips.count + cargo.generators.count) > 1)
+
+      # To shorten runtime, let's assume that we should not move anything to the highest empty floor
+      next if destination_floor_index == 0 && state.floors[0].generators.count == 0 && state.floors[0].microchips.count == 0
+      next if destination_floor_index == 1 && state.floors[0].generators.count == 0 && state.floors[0].microchips.count == 0 && state.floors[1].generators.count == 0 && state.floors[1].microchips.count == 0
+
+      # To shorten runtime, let's assume a generator should not be moved to a floor lower than its matching microchip
+      if destination_floor_index < state.elevator_floor && cargo.generators.count > 0
+        generator = cargo.generators[0]
+        microchip_location = 0
+        state.floors.each do |floor|
+          break if floor.microchips.include?(generator)
+          microchip_location += 1
+        end
+        next if microchip_location < state.elevator_floor
+      end
+
       floors_clone = clone_floors(state.floors)
       next_state = State.new(floors_clone, destination_floor_index)
 
-      source_floor = floors_clone[state.elevator_floor]
-      destination_floor = floors_clone[destination_floor_index]
+      source_floor = next_state.floors[state.elevator_floor]
+      destination_floor = next_state.floors[destination_floor_index]
 
       source_floor.generators -= cargo.generators
       source_floor.microchips -= cargo.microchips
       destination_floor.generators += cargo.generators
       destination_floor.microchips += cargo.microchips
 
-      next if states_seen.keys.any? { |s| s == next_state }
+      next if states_seen.keys.include?(next_state)
 
-      # p "We could move #{cargo.generators} generators and #{cargo.microchips} microchips from floor #{state.elevator_floor} to floor #{destination_floor}"
       possible_moves << next_state
     end
   end
@@ -136,15 +147,9 @@ end
 
 def minimum_moves_to_solution(state, states_seen, solution_state)
   loop do
-    # p "Checking state with hash #{state.hash}"
-
     possible_moves = possible_next_moves(state, states_seen)
 
-    #    p "Possible moves: #{possible_moves.length}"
-
     possible_moves.each do |possible_move|
-      # p "#{possible_move.to_str}"
-
       return states_seen[state] + 1 if possible_move == solution_state
 
       states_seen[possible_move] = states_seen[state] + 1
@@ -152,12 +157,9 @@ def minimum_moves_to_solution(state, states_seen, solution_state)
 
     state.visited = true
 
-    possible_next_states = states_seen.keys.select { |s| s.visited == false }
-    state = possible_next_states.sort_by { |key, value| value }.last
+    possible_next_states = states_seen.select { |s, v| s.visited == false }
 
-    # p "States seen: #{states_seen.length}"
-    # p "Next state: #{state.to_str}"
-    # p "Steps to get there: #{states_seen[state]}"
+    state = possible_next_states.min_by { |key, value| value }[0]
   end
 end
 
@@ -175,14 +177,10 @@ lines[0..2].each do |line|
 end
 floors << Floor.new([], [])
 
-initial_state = State.new(floors, 2)
-
-p "Initial: #{initial_state.to_str}"
+initial_state = State.new(floors, 0)
 
 solution_floors = [Floor.new([], []), Floor.new([], []), Floor.new([], []), solution_top_floor]
 solution_state = State.new(solution_floors, 3)
-
-p "Solution: #{solution_state.to_str}"
 
 states_seen = { initial_state => 0 }
 
